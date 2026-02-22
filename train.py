@@ -64,6 +64,7 @@ def data_loader(data_dir, batch_size, shuffle=True, test=False):
 class TrainingConfig:
     n_epochs: int = 100
     lr: float = 0.1
+    warmup_epochs: int = 5
     batch_size: int = 250
     beta1: float = 0.9
     beta2: float = 0.999
@@ -76,8 +77,6 @@ def train_model(config: TrainingConfig):
     test_loader = data_loader(
         data_dir="./data", batch_size=config.batch_size, test=True
     )
-    print(len(train_loader))
-    print(len(test_loader))
 
     model = models.resnet18().to(device)
 
@@ -90,7 +89,13 @@ def train_model(config: TrainingConfig):
         weight_decay=config.weight_decay,
     )
 
-    for epoch in range(config.n_epochs):
+    def get_lr_scale(epoch):
+        if epoch < config.warmup_epochs:
+            return config.lr * epoch / config.warmup_epochs
+        else:
+            return config.lr
+
+    for epoch in range(1, config.n_epochs + 1):
         for i, (images, labels) in enumerate(train_loader):
             images = images.to(device)
             labels = labels.to(device)
@@ -99,10 +104,12 @@ def train_model(config: TrainingConfig):
             outputs = model(images)
             loss = criterion(outputs, labels)
             loss.backward()
-            print(outputs.grad)
+            lr = get_lr_scale(epoch)
+            for param_group in optimizer.param_groups:
+                param_group["lr"] = lr
             optimizer.step()
             print(
-                f"Epoch [{epoch + 1}/{config.n_epochs}], Step [{i + 1}/{len(train_loader)}], Loss: {loss.item():.4f}"
+                f"Epoch [{epoch}/{config.n_epochs}], Step [{i + 1}/{len(train_loader)}], Loss: {loss.item():.4f}, Lr: {lr:.6f}"
             )
         acc = 0
         for images, labels in test_loader:
