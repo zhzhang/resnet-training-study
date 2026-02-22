@@ -78,7 +78,7 @@ def train_model(config: TrainingConfig):
         data_dir="./data", batch_size=config.batch_size, test=True
     )
 
-    model = models.resnet18().to(device)
+    model = models.resnet50().to(device)
 
     criterion = nn.CrossEntropyLoss()
 
